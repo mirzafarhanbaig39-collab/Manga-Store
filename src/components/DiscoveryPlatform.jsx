@@ -7,10 +7,13 @@ import { useStore } from "../context/StoreContext.jsx";
 const FAVORITES_KEY = "mangaverse-anilist-favorites-v1";
 const MANAGEMENT_KEY = "mangaverse-series-management-v1";
 const GENRES = [
-  "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Horror",
-  "Mystery", "Romance", "Sci-Fi", "Sports", "Supernatural", "Thriller",
+  "Action", "Adventure", "Fantasy", "Romance", "Horror", "Mystery",
+  "Thriller", "Comedy", "Supernatural", "Sci-Fi", "Sports", "Martial Arts",
 ];
-const EMPTY_CATALOG = { popularManga: [], trendingAnime: [], updatedManga: [], updatedAnime: [] };
+const EMPTY_CATALOG = {
+  popularManga: [], curatedManga: [], trendingManga: [], newManga: [],
+  trendingAnime: [], updatedManga: [], updatedAnime: [],
+};
 
 function readLocal(key, fallback, isValid) {
   try {
@@ -64,16 +67,24 @@ function imageOf(media) {
 }
 
 function cleanDescription(description = "") {
+  if (typeof description !== "string") return "";
   return description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function MediaImage({ media, className = "" }) {
+function mediaHasGenre(media, genre) {
+  return media.genres?.includes(genre) || media.tags?.some((tag) => tag.name === genre);
+}
+
+function MediaImage({ media, className = "", eager = false }) {
   const [failed, setFailed] = useState(false);
   const image = imageOf(media);
+  useEffect(() => setFailed(false), [image, media.id]);
   return <div className={`media-image ${failed || !image ? "media-image-fallback" : ""} ${className}`}>
     {image && !failed
-      ? <img src={image} alt={`${titleOf(media)} cover`} loading="lazy" onError={() => setFailed(true)} />
-      : <span aria-label={`${titleOf(media)} cover unavailable`} role="img">{titleOf(media)}</span>}
+      ? <img src={image} alt={`${titleOf(media)} manga cover`} loading={eager ? "eager" : "lazy"} decoding="async" onError={() => setFailed(true)} />
+      : <div className="media-image-fallback-art" role="img" aria-label={`${titleOf(media)} cover artwork unavailable`}>
+        <span>{media.genres?.[0] || "MANGA VERSE"}</span><strong>{titleOf(media)}</strong><small>Cover artwork unavailable</small>
+      </div>}
   </div>;
 }
 
@@ -107,7 +118,12 @@ function AddDemoBagButton({ media }) {
     type="button"
     className="media-add-button"
     aria-label={`Add demo ${titleOf(media)} to bag`}
-    onClick={() => addToCart(product)}
+    onPointerDown={(event) => event.stopPropagation()}
+    onClick={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      addToCart(product);
+    }}
   ><ShoppingBag size={14} /> Add demo item · ₹499</button>;
 }
 
@@ -120,31 +136,31 @@ function MediaCard({ media, favorites, onToggle, updated = false }) {
         <MediaImage media={media} />
       </Link>
       <FavoriteButton media={media} favorites={favorites} onToggle={onToggle} />
-      {updated && date && <span className="media-update-tag">CATALOG UPDATED</span>}
+      {updated && date && <span className="media-update-tag">CATALOGUE RECORD</span>}
     </div>
     <div className="media-card-copy">
       <div className="media-card-meta">
         <span>{media.genres?.slice(0, 2).join(" · ") || media.type}</span>
         {media.averageScore != null
           ? <span className="media-rating"><Star size={12} fill="currentColor" /> {(media.averageScore / 10).toFixed(1)}</span>
-          : <span className="media-rating">Unrated</span>}
+          : <span className="media-rating">No score</span>}
       </div>
       <Link className="media-title" to={`/series/${media.id}`}>{titleOf(media)}</Link>
-      <p className="media-card-subtitle">
-        {year || media.status?.replaceAll("_", " ").toLowerCase() || "AniList catalogue"}
-        {updated && date ? ` · ${new Date(date).toLocaleDateString()}` : ""}
-      </p>
+      <p className="media-card-description">{cleanDescription(media.description) || "Explore the series, its publication details and related stories."}</p>
+      <div className="media-card-footer"><span>{year || media.status?.replaceAll("_", " ").toLowerCase() || "AniList title"}{media.chapters ? ` · ${media.chapters} chapters` : ""}</span>
+        {updated && date && <time dateTime={date}>{new Date(date).toLocaleDateString()}</time>}
+      </div>
       <AddDemoBagButton media={media} />
     </div>
   </article>;
 }
 
-function MediaCarousel({ title, eyebrow, items = [], favorites, onToggle, updated = false, action }) {
+function MediaCarousel({ title, eyebrow, items = [], favorites, onToggle, updated = false, action, loading = false }) {
   const railRef = useRef(null);
   const pointer = useRef(null);
   const dragged = useRef(false);
   const scroll = (direction) => railRef.current?.scrollBy({ left: direction * railRef.current.clientWidth * 0.8, behavior: "smooth" });
-  return <section className="discovery-section">
+  return <section className="discovery-section" role="region" aria-label={`${title} carousel`}>
     <div className="discovery-heading">
       <div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div>
       <div className="discovery-heading-actions">
@@ -156,10 +172,11 @@ function MediaCarousel({ title, eyebrow, items = [], favorites, onToggle, update
     {items.length ? <div
       className="media-rail"
       ref={railRef}
-      role="region"
+      role="group"
       aria-label={`${title} carousel`}
+      tabIndex={0}
       onPointerDown={(event) => {
-        if (event.pointerType === "mouse" && !event.target.closest("button")) {
+        if (event.pointerType === "mouse" && !event.target.closest("button, a")) {
           pointer.current = {
             x: event.clientX,
             left: railRef.current.scrollLeft,
@@ -184,7 +201,7 @@ function MediaCarousel({ title, eyebrow, items = [], favorites, onToggle, update
       onPointerUp={() => { pointer.current = null; }}
       onPointerCancel={() => { pointer.current = null; }}
       onClickCapture={(event) => {
-        if (dragged.current) {
+        if (dragged.current && !event.target.closest("button, a")) {
           event.preventDefault();
           event.stopPropagation();
           dragged.current = false;
@@ -192,56 +209,88 @@ function MediaCarousel({ title, eyebrow, items = [], favorites, onToggle, update
       }}
     >
       {items.map((media) => <MediaCard key={media.id} media={media} favorites={favorites} onToggle={onToggle} updated={updated} />)}
-    </div> : <div className="media-empty">Catalogue entries will appear here when AniList responds.</div>}
+    </div> : loading
+      ? <div className="media-skeleton-rail" role="status" aria-label={`Loading ${title}`}>
+        {Array.from({ length: 6 }, (_, index) => <div className="media-skeleton" key={index}><span /><i /><i /></div>)}
+      </div>
+      : <div className="media-empty">No verified catalogue entries are available here right now.</div>}
   </section>;
 }
 
-function FreshnessStatus({ loading, error, usingCache, savedAt, onRefresh }) {
+function FreshnessStatus({ loading, error, usingCache, usingFallback, savedAt, onRefresh }) {
   return <div className="catalog-status" aria-live="polite">
-    <span>{loading ? "Refreshing AniList catalogue…" : usingCache ? "Showing saved catalogue data" : "Live catalogue from AniList"}</span>
+    <span>{loading ? "Connecting to AniList…" : usingFallback ? "Showing the local manga guide" : usingCache ? "Showing saved catalogue data" : "Live catalogue from AniList"}</span>
     {savedAt && <span>Last fetched {new Date(savedAt).toLocaleString()}</span>}
     {error && <span className="catalog-error">{error}</span>}
-    <button type="button" className="text-link" onClick={onRefresh} disabled={loading}><RefreshCw size={14} /> Refresh</button>
+    <button type="button" className="text-link" onClick={onRefresh} disabled={loading}><RefreshCw size={14} /> Retry</button>
   </div>;
 }
 
-function HeroFeature({ media, onPrevious, onNext, favorites, onToggle }) {
+function HeroFeature({ media, index, total, onPrevious, onNext, favorites, onToggle }) {
   if (!media) return <section className="discovery-hero discovery-hero-empty">
-    <div className="wrap"><p className="eyebrow">MANGAVERSE · ANIList DISCOVERY</p><h1>Enter the world<br />of <em>anime & manga.</em></h1>
-      <p className="discovery-hero-text">We are waiting for AniList catalogue data. You can retry now or browse the store demo.</p>
-      <Link className="button button-red" to="/store">Explore demo store <ArrowRight size={16} /></Link>
+    <div className="wrap"><p className="eyebrow">MANGAVERSE · MANGA DISCOVERY</p><h1>Find your next<br /><em>great story.</em></h1>
+      <p className="discovery-hero-text">A fresh reading list is on its way. Browse the local manga guide while catalogue data reconnects.</p>
+      <Link className="button button-red" to="/manga">Browse manga <ArrowRight size={16} /></Link>
     </div>
   </section>;
-  const image = media.bannerImage || imageOf(media);
-  return <section className="discovery-hero" style={image ? { "--hero-cover": `url("${image}")` } : undefined}>
+  const banner = media.bannerImage;
+  const score = media.averageScore == null ? "" : (media.averageScore / 10).toFixed(1);
+  return <section className="discovery-hero" style={banner ? { "--hero-cover": `url("${banner}")` } : undefined}>
     <div className="discovery-hero-scrim" />
     <div className="wrap discovery-hero-inner">
       <div className="discovery-hero-copy">
-        <p className="eyebrow">FEATURED FROM ANILIST · {media.type}</p>
-        <h1>Enter the world<br />of <em>manga.</em></h1>
+        <p className="eyebrow">MANGAVERSE SPOTLIGHT · {media.type}</p>
+        <h1>Enter the world<br /><em>of manga.</em></h1>
         <h2>{titleOf(media)}</h2>
         <p className="discovery-hero-text">{cleanDescription(media.description) || "Explore the worlds and stories readers are discovering right now."}</p>
-        <div className="discovery-hero-meta">{media.genres?.slice(0, 3).join(" · ")}{media.startDate?.year ? ` · ${media.startDate.year}` : ""}</div>
+        <div className="discovery-hero-meta">
+          {media.genres?.slice(0, 3).join(" · ")}
+          {media.startDate?.year ? ` · ${media.startDate.year}` : ""}
+          {score && <span className="hero-score"><Star size={14} fill="currentColor" /> {score}</span>}
+        </div>
         <div className="hero-actions"><Link className="button button-red" to={`/series/${media.id}`}>Explore this series <ArrowRight size={16} /></Link><Link className="button button-ghost" to="/manga">Discover manga</Link>
           <FavoriteButton media={media} favorites={favorites} onToggle={onToggle} />
         </div>
       </div>
-      <div className="discovery-hero-art"><MediaImage media={media} /></div>
+      <div className="discovery-hero-art"><MediaImage media={media} className="hero-cover" eager /></div>
       <div className="discovery-hero-controls">
         <button type="button" className="rail-arrow" aria-label="Previous featured series" onClick={onPrevious}><ArrowLeft size={17} /></button>
-        <span>FEATURED SERIES</span>
+        <span>0{index + 1} <i>/</i> 0{total}</span>
         <button type="button" className="rail-arrow" aria-label="Next featured series" onClick={onNext}><ArrowRight size={17} /></button>
       </div>
     </div>
   </section>;
 }
 
-export function DiscoveryHome({ catalog, loading, error, usingCache, savedAt, refresh, favorites, onToggle, settings }) {
+function GenreExplorer({ onSelect }) {
+  return <section className="discovery-section genre-explorer" id="genres">
+    <div className="discovery-heading">
+      <div><p className="eyebrow">PICK A PATH</p><h2>Explore by genre.</h2><p className="section-intro">Find the kind of story you’re in the mood for.</p></div>
+      <Link className="text-link" to="/manga">All manga <ArrowRight size={15} /></Link>
+    </div>
+    <div className="discovery-genres">{GENRES.map((genre, index) => <button className={`genre-tile genre-tone-${index % 6}`} key={genre} type="button" onClick={() => onSelect(genre)}>
+      <span className="genre-tile-index">{String(index + 1).padStart(2, "0")}</span><strong>{genre}</strong><ArrowUpRight size={16} />
+    </button>)}</div>
+  </section>;
+}
+
+function PopularMangaCollection({ items, favorites, onToggle }) {
+  return <section className="discovery-section popular-collection" id="popular-manga">
+    <div className="discovery-heading">
+      <div><p className="eyebrow">THE ESSENTIAL READING LIST</p><h2>The collection</h2><p className="section-intro">A hand-picked gateway to celebrated manga worlds. Scores and descriptions come from AniList when available.</p></div>
+      <Link className="text-link" to="/manga">Browse the collection <ArrowRight size={15} /></Link>
+    </div>
+    <div className="discovery-popular-grid">{items.map((media) => <MediaCard key={media.id} media={media} favorites={favorites} onToggle={onToggle} />)}</div>
+  </section>;
+}
+
+export function DiscoveryHome({ catalog, loading, error, usingCache, usingFallback, savedAt, refresh, favorites, onToggle, settings }) {
   const allFeatures = useMemo(() => {
-    const combined = [...settings.customMedia, ...catalog.trendingAnime, ...catalog.popularManga];
+    const mangaItems = catalog.curatedManga?.length ? catalog.curatedManga : catalog.popularManga;
+    const combined = [...settings.customMedia, ...mangaItems];
     const ids = new Set(settings.featuredIds);
-    const selected = combined.filter((item) => ids.has(item.id));
-    return selected.length ? selected : [...catalog.trendingAnime, ...catalog.popularManga];
+    const selected = combined.filter((item) => ids.has(item.id) && item.type === "MANGA");
+    return selected.length ? selected : mangaItems.slice(0, 4);
   }, [catalog, settings]);
   const [featureIndex, setFeatureIndex] = useState(0);
   useEffect(() => setFeatureIndex(0), [allFeatures.length]);
@@ -252,31 +301,33 @@ export function DiscoveryHome({ catalog, loading, error, usingCache, savedAt, re
   }, [allFeatures.length]);
   const genreNavigate = useNavigate();
   const featured = allFeatures[featureIndex];
-  const customAndCatalog = useMemo(() => {
-    const items = [...settings.customMedia, ...catalog.popularManga, ...catalog.trendingAnime, ...catalog.updatedManga, ...catalog.updatedAnime];
-    return [...new Map(items.map((item) => [item.id, item])).values()];
-  }, [catalog, settings.customMedia]);
+  const curatedManga = catalog.curatedManga?.length ? catalog.curatedManga : catalog.popularManga;
+  const popularIds = new Set(curatedManga.map((item) => item.id));
+  const trendingManga = catalog.trendingManga.filter((item) => !popularIds.has(item.id));
+  const trendingIds = new Set(trendingManga.map((item) => item.id));
+  const newManga = catalog.newManga.filter((item) => !popularIds.has(item.id) && !trendingIds.has(item.id));
 
   return <main className="discovery-page">
     <HeroFeature
       media={featured}
+      index={featureIndex}
+      total={allFeatures.length}
       onPrevious={() => setFeatureIndex((index) => (index - 1 + allFeatures.length) % allFeatures.length)}
       onNext={() => setFeatureIndex((index) => (index + 1) % allFeatures.length)}
       favorites={favorites}
       onToggle={onToggle}
     />
-    <div className="wrap"><FreshnessStatus loading={loading} error={error} usingCache={usingCache} savedAt={savedAt} onRefresh={refresh} />
-      {!catalog.trendingAnime.length && loading && <div className="catalog-loading" role="status">Connecting to AniList…</div>}
-      <MediaCarousel title="Trending anime" eyebrow="WHAT THE WORLD IS WATCHING" items={catalog.trendingAnime} favorites={favorites} onToggle={onToggle} action={{ label: "Browse anime", to: "/anime" }} />
-      <MediaCarousel title="Popular manga" eyebrow="FAN-FAVOURITE SERIES" items={catalog.popularManga} favorites={favorites} onToggle={onToggle} action={{ label: "Browse manga", to: "/manga" }} />
-      <section className="discovery-section genre-explorer" id="genres">
-        <div className="discovery-heading"><div><p className="eyebrow">FIND YOUR NEXT OBSESSION</p><h2>Explore by genre.</h2></div><Link className="text-link" to="/manga">All manga <ArrowRight size={15} /></Link></div>
-        <div className="discovery-genres">{GENRES.map((genre) => <button key={genre} type="button" onClick={() => genreNavigate(`/manga?genre=${encodeURIComponent(genre)}`)}>{genre}<ArrowUpRight size={14} /></button>)}</div>
-      </section>
-      <MediaCarousel title="Recently updated manga" eyebrow="ANILIST CATALOGUE ACTIVITY" items={catalog.updatedManga} favorites={favorites} onToggle={onToggle} updated action={{ label: "All updates", to: "/updates" }} />
-      <p className="catalog-footnote">“Updated” refers to the AniList catalogue record timestamp, not a confirmed new chapter or episode publication.</p>
-      <MediaCarousel title="Recently updated anime" eyebrow="ANILIST CATALOGUE ACTIVITY" items={catalog.updatedAnime} favorites={favorites} onToggle={onToggle} updated action={{ label: "Latest updates", to: "/updates" }} />
-      <MediaCarousel title="Editor's manga shelf" eyebrow="A FEW MORE WORLDS TO EXPLORE" items={customAndCatalog.filter((item) => item.type === "MANGA").slice(8, 24)} favorites={favorites} onToggle={onToggle} />
+    <div className="wrap discovery-content">
+      <FreshnessStatus loading={loading} error={error} usingCache={usingCache} usingFallback={usingFallback} savedAt={savedAt} onRefresh={refresh} />
+      <MediaCarousel title="Latest manga updates" eyebrow="RECENTLY TOUCHED CATALOGUE RECORDS" items={catalog.updatedManga} favorites={favorites} onToggle={onToggle} updated loading={loading} action={{ label: "All manga updates", to: "/updates" }} />
+      <p className="catalog-footnote">Update dates reflect AniList catalogue record edits, not confirmed chapter or volume publication dates.</p>
+      <MediaCarousel title="Popular manga" eyebrow="POPULARITY ON ANILIST" items={catalog.popularManga.filter((item) => !popularIds.has(item.id))} favorites={favorites} onToggle={onToggle} loading={loading} action={{ label: "Browse the collection", to: "/manga" }} />
+      <PopularMangaCollection items={curatedManga.slice(0, 18)} favorites={favorites} onToggle={onToggle} />
+      <GenreExplorer onSelect={(genre) => genreNavigate(`/manga?genre=${encodeURIComponent(genre)}`)} />
+      <MediaCarousel title="Trending manga" eyebrow="READER MOMENTUM ON ANILIST" items={trendingManga} favorites={favorites} onToggle={onToggle} loading={loading} action={{ label: "Explore manga", to: "/manga" }} />
+      <MediaCarousel title="Newly listed manga" eyebrow="RECENTLY STARTED SERIES" items={newManga} favorites={favorites} onToggle={onToggle} loading={loading} action={{ label: "Browse new series", to: "/manga?sort=new" }} />
+      <MediaCarousel title="Trending anime" eyebrow="FROM PAGE TO SCREEN" items={catalog.trendingAnime} favorites={favorites} onToggle={onToggle} loading={loading} action={{ label: "Browse anime", to: "/anime" }} />
+      <MediaCarousel title="Recently updated anime" eyebrow="ANILIST CATALOGUE ACTIVITY" items={catalog.updatedAnime} favorites={favorites} onToggle={onToggle} updated loading={loading} action={{ label: "Latest anime updates", to: "/updates" }} />
     </div>
   </main>;
 }
@@ -286,31 +337,54 @@ function BrowsePage({ catalog, favorites, onToggle, type }) {
   const navigate = useNavigate();
   const params = new URLSearchParams(location.search);
   const [genre, setGenre] = useState(params.get("genre") || "");
-  const [sort, setSort] = useState("score");
-  useEffect(() => setGenre(new URLSearchParams(location.search).get("genre") || ""), [location.search]);
-  const feed = type === "ANIME" ? catalog.trendingAnime : catalog.popularManga;
+  const [query, setQuery] = useState(params.get("q") || "");
+  const [status, setStatus] = useState(params.get("status") || "");
+  const [sort, setSort] = useState(params.get("sort") || "popular");
+  useEffect(() => {
+    const current = new URLSearchParams(location.search);
+    setGenre(current.get("genre") || "");
+    setQuery(current.get("q") || "");
+    setStatus(current.get("status") || "");
+    setSort(current.get("sort") || "popular");
+  }, [location.search]);
   const allMedia = type === "ANIME"
-    ? [...feed, ...catalog.updatedAnime]
-    : [...feed, ...catalog.updatedManga];
+    ? [...catalog.trendingAnime, ...catalog.updatedAnime]
+    : [...catalog.curatedManga, ...catalog.popularManga, ...catalog.trendingManga, ...catalog.newManga, ...catalog.updatedManga];
   const items = useMemo(() => {
     const unique = [...new Map(allMedia.map((media) => [media.id, media])).values()];
-    const filtered = unique.filter((media) => !genre || media.genres?.includes(genre));
+    const term = query.trim().toLowerCase();
+    const filtered = unique.filter((media) =>
+      (!term || titleOf(media).toLowerCase().includes(term)) &&
+      (!genre || mediaHasGenre(media, genre)) &&
+      (!status || media.status === status),
+    );
     if (sort === "score") filtered.sort((a, b) => (b.averageScore || 0) - (a.averageScore || 0));
+    if (sort === "popular") filtered.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
     if (sort === "title") filtered.sort((a, b) => titleOf(a).localeCompare(titleOf(b)));
-    if (sort === "updated") filtered.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    if (sort === "new") filtered.sort((a, b) => (b.startDate?.year || 0) - (a.startDate?.year || 0));
     return filtered;
-  }, [allMedia, genre, sort]);
+  }, [allMedia, genre, query, sort, status]);
+  function updateFilter(key, value) {
+    const next = new URLSearchParams();
+    const values = { genre, q: query.trim(), status, sort, [key]: value };
+    Object.entries(values).forEach(([name, item]) => {
+      if (item) next.set(name, item);
+    });
+    navigate({ search: next.toString() ? `?${next.toString()}` : "" }, { replace: true });
+  }
   const heading = type === "ANIME" ? "Explore anime." : "Explore manga.";
   return <main className="wrap discovery-listing">
-    <div className="page-banner"><p className="eyebrow">ANILIST LIVE CATALOGUE · {type}</p><h1>{heading}</h1><p>Real catalogue entries and cover artwork supplied by AniList. Search to find more titles.</p></div>
+    <div className="page-banner"><p className="eyebrow">MANGAVERSE DISCOVERY · {type}</p><h1>{heading}</h1><p>Search real catalogue entries, explore by genre and find your next series.</p></div>
     <div className="discovery-filters">
-      <label><span>Genre</span><select aria-label="Filter series by genre" value={genre} onChange={(event) => { setGenre(event.target.value); navigate({ search: event.target.value ? `?genre=${encodeURIComponent(event.target.value)}` : "" }, { replace: true }); }}><option value="">All genres</option>{GENRES.map((item) => <option key={item}>{item}</option>)}</select></label>
-      <label><span>Sort by</span><select aria-label="Sort series" value={sort} onChange={(event) => setSort(event.target.value)}><option value="score">Highest score</option><option value="updated">Catalogue recently updated</option><option value="title">Title A–Z</option></select></label>
-      <span>{items.length} titles</span>
+      <label className="browse-search"><span>Title</span><input aria-label="Search titles" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by title" /></label>
+      <label><span>Genre</span><select aria-label="Filter series by genre" value={genre} onChange={(event) => { setGenre(event.target.value); updateFilter("genre", event.target.value); }}><option value="">All genres</option>{GENRES.map((item) => <option key={item}>{item}</option>)}</select></label>
+      <label><span>Status</span><select aria-label="Filter by publication status" value={status} onChange={(event) => { setStatus(event.target.value); updateFilter("status", event.target.value); }}><option value="">Any status</option><option value="RELEASING">Releasing</option><option value="FINISHED">Finished</option><option value="HIATUS">Hiatus</option><option value="NOT_YET_RELEASED">Not yet released</option><option value="CANCELLED">Cancelled</option></select></label>
+      <label><span>Sort by</span><select aria-label="Sort series" value={sort} onChange={(event) => { setSort(event.target.value); updateFilter("sort", event.target.value); }}><option value="popular">Popularity</option><option value="score">Highest rating</option><option value="new">Release year</option><option value="title">Title A–Z</option></select></label>
+      <span className="filter-count">{items.length} titles</span>
     </div>
     {items.length
       ? <div className="discovery-grid">{items.map((media) => <MediaCard key={media.id} media={media} favorites={favorites} onToggle={onToggle} />)}</div>
-      : <div className="media-empty">{feed.length ? "No titles match this genre in the current selection." : "AniList data is not available yet. Try refreshing the homepage."}</div>}
+      : <div className="media-empty"><h2>No titles match those filters.</h2><p>Try a different title, genre or publication status.</p></div>}
   </main>;
 }
 
@@ -332,9 +406,10 @@ function SearchPage({ catalog, favorites, onToggle }) {
     const genre = GENRES.find((item) => item.toLowerCase() === query.trim().toLowerCase());
     if (genre) {
       const localItems = [
-        ...catalog.popularManga, ...catalog.trendingAnime,
+        ...catalog.curatedManga, ...catalog.popularManga, ...catalog.trendingManga,
+        ...catalog.newManga, ...catalog.trendingAnime,
         ...catalog.updatedManga, ...catalog.updatedAnime,
-      ].filter((media) => media.genres?.includes(genre));
+      ].filter((media) => mediaHasGenre(media, genre));
       setItems([...new Map(localItems.map((media) => [media.id, media])).values()]);
       setLoading(false);
       setError("");
@@ -344,7 +419,14 @@ function SearchPage({ catalog, favorites, onToggle }) {
     setLoading(true);
     setError("");
     searchAniList(query, { signal: controller.signal }).then(setItems).catch((requestError) => {
-      if (requestError.name !== "AbortError") setError(requestError.message);
+      if (requestError.name !== "AbortError") {
+        const localItems = [
+          ...catalog.curatedManga, ...catalog.popularManga, ...catalog.trendingManga,
+          ...catalog.newManga, ...catalog.updatedManga, ...catalog.updatedAnime,
+        ].filter((media) => titleOf(media).toLowerCase().includes(query.trim().toLowerCase()));
+        setItems([...new Map(localItems.map((media) => [media.id, media])).values()]);
+        setError(requestError.message);
+      }
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [catalog, query]);
@@ -380,7 +462,10 @@ function FavoritesPage({ favorites, onToggle }) {
 function SeriesDetails({ catalog, favorites, onToggle }) {
   const { id } = useParams();
   const mediaId = Number(id);
-  const known = useMemo(() => [...catalog.popularManga, ...catalog.trendingAnime, ...catalog.updatedManga, ...catalog.updatedAnime].find((item) => item.id === mediaId), [catalog, mediaId]);
+  const known = useMemo(() => [
+    ...catalog.curatedManga, ...catalog.popularManga, ...catalog.trendingManga,
+    ...catalog.newManga, ...catalog.trendingAnime, ...catalog.updatedManga, ...catalog.updatedAnime,
+  ].find((item) => item.id === mediaId || item.id === id), [catalog, id, mediaId]);
   const [media, setMedia] = useState(known || null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(!known);
@@ -388,16 +473,25 @@ function SeriesDetails({ catalog, favorites, onToggle }) {
     setMedia(known || null);
     setError("");
     setLoading(!known);
+    if (known?.isFallback) return undefined;
     const controller = new AbortController();
     // The full request includes related series, which are not part of the list feeds.
     fetchAniListMedia(id, { signal: controller.signal }).then(setMedia).catch((requestError) => {
       if (requestError.name !== "AbortError") setError(requestError.message);
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [id]);
+  }, [id, known]);
   if (loading) return <main className="wrap discovery-listing"><p className="catalog-loading">Loading series details…</p></main>;
   if (error || !media) return <main className="wrap discovery-listing"><div className="media-empty"><h1>Series unavailable</h1><p>{error || "No details were found."}</p><Link className="text-link" to="/manga"><ArrowLeft size={15} /> Back to manga</Link></div></main>;
-  const related = media.relations?.edges?.map((edge) => edge.node).filter((node) => node && node.id) || [];
+  const related = media.relations?.edges?.map((edge) => edge.node).filter((node) => node && node.id && node.type === "MANGA") || [];
+  const contributors = [...new Set((media.staff?.edges || [])
+    .filter((edge) => /story|art|author|original/i.test(edge.role || ""))
+    .map((edge) => edge.node?.name?.full)
+    .filter(Boolean))];
+  const startDate = media.startDate?.year
+    ? [media.startDate.year, media.startDate.month, media.startDate.day].filter(Boolean).join("-")
+    : "";
+  const status = media.status?.replaceAll("_", " ").toLowerCase();
   return <main className="wrap series-detail-page">
     <Link className="text-link" to={media.type === "ANIME" ? "/anime" : "/manga"}><ArrowLeft size={15} /> Back to {media.type === "ANIME" ? "anime" : "manga"}</Link>
     <div className="series-detail-grid">
@@ -406,17 +500,22 @@ function SeriesDetails({ catalog, favorites, onToggle }) {
         <p className="eyebrow">{media.type} · {media.format || "SERIES"}</p><h1>{titleOf(media)}</h1>
         {media.title?.native && <p className="series-native-title">{media.title.native}</p>}
         <p className="series-genres">{media.genres?.join(" · ")}</p>
-        <div className="series-facts">{media.averageScore != null && <span><Star size={14} fill="currentColor" /> {(media.averageScore / 10).toFixed(1)} / 10</span>}
-          {media.startDate?.year && <span>{media.startDate.year}</span>}
-          <span>{media.status?.replaceAll("_", " ") || "Status unavailable"}</span>
+        <div className="series-facts">{media.averageScore != null
+          ? <span><Star size={14} fill="currentColor" /> {(media.averageScore / 10).toFixed(1)} / 10</span>
+          : <span>Not rated</span>}
+          {status && <span>{status}</span>}
+          {startDate && <span>Started {startDate}</span>}
           {media.episodes && <span>{media.episodes} episodes</span>}
           {media.chapters && <span>{media.chapters} chapters</span>}
           {media.volumes && <span>{media.volumes} volumes</span>}
         </div>
-        <div className="series-description">{cleanDescription(media.description) || "AniList does not provide a synopsis for this series."}</div>
+        {contributors.length > 0 && <p className="series-contributors">Creator · {contributors.join(", ")}</p>}
+        <div className="series-description">{cleanDescription(media.description) || (media.isFallback
+          ? "Full synopsis and publication details will appear when AniList is available."
+          : "AniList does not provide a synopsis for this series.")}</div>
         <div className="hero-actions"><button type="button" className={`button button-outline ${favorites.some((item) => item.id === media.id) ? "is-saved" : ""}`} onClick={() => onToggle(media)}><Heart size={16} fill={favorites.some((item) => item.id === media.id) ? "currentColor" : "none"} /> {favorites.some((item) => item.id === media.id) ? "In favorites" : "Add to favorites"}</button>
           {media.siteUrl && <a className="button button-ghost" href={media.siteUrl} target="_blank" rel="noreferrer">AniList page <ArrowUpRight size={15} /></a>}</div>
-        <div className="series-demo-purchase"><AddDemoBagButton media={media} /><small>Demo sample item only; not a real product or stock listing.</small></div>
+        {!media.isFallback && <div className="series-demo-purchase"><AddDemoBagButton media={media} /><small>Demo sample item only; not a real product or stock listing.</small></div>}
       </div>
     </div>
     {related.length > 0 && <MediaCarousel title="Related series" eyebrow="CONNECTED WORLDS" items={related} favorites={favorites} onToggle={onToggle} />}
@@ -430,7 +529,8 @@ export function SeriesManagement({ catalog, settings, setSettings }) {
   const [notice, setNotice] = useState("");
   const candidates = useMemo(() => [...new Map([
     ...settings.customMedia, ...catalog.trendingAnime, ...catalog.popularManga,
-    ...catalog.updatedAnime, ...catalog.updatedManga,
+    ...catalog.updatedAnime, ...catalog.updatedManga, ...catalog.curatedManga,
+    ...catalog.trendingManga, ...catalog.newManga,
   ].map((item) => [item.id, item])).values()], [catalog, settings.customMedia]);
   const featured = useMemo(() => {
     const byId = new Map(candidates.map((item) => [item.id, item]));

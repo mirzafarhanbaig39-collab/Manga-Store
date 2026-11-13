@@ -59,7 +59,8 @@ describe("MANGAVERSE discovery platform", () => {
   it("saves a series to local favorites and removes it from the favorites page", async () => {
     const user = userEvent.setup();
     renderApp();
-    await user.click(await screen.findByRole("button", { name: "Add One Piece to favorites" }));
+    await screen.findByText("Live catalogue from AniList");
+    await user.click((await screen.findAllByRole("button", { name: "Add One Piece to favorites" }))[0]);
     expect(JSON.parse(window.localStorage.getItem("mangaverse-anilist-favorites-v1"))[0].id).toBe(1);
     await user.click(screen.getByRole("link", { name: "Favorites" }));
     expect(screen.getByRole("heading", { name: "My favorites." })).toBeInTheDocument();
@@ -71,8 +72,9 @@ describe("MANGAVERSE discovery platform", () => {
   it("adds a discovery series to the demo bag and supports quantity changes and removal", async () => {
     const user = userEvent.setup();
     renderApp();
+    await screen.findByText("Live catalogue from AniList");
     await user.click(await screen.findByRole("button", { name: "Add demo One Piece to bag" }));
-    expect(screen.getByRole("button", { name: "Open bag, 1 items" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Open bag, 1 items" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open bag, 1 items" }));
     const drawer = screen.getByRole("dialog", { name: /the bag/i });
     expect(within(drawer).getAllByText("One Piece")).not.toHaveLength(0);
@@ -87,7 +89,7 @@ describe("MANGAVERSE discovery platform", () => {
     renderApp("/series/1");
     expect(await screen.findByRole("heading", { name: "One Piece" })).toBeInTheDocument();
     expect(screen.getByText("130 chapters")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Related series carousel" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Related series carousel" })).toBeInTheDocument();
   });
 
   it("can feature and unfeature titles without removing them from the catalogue", async () => {
@@ -112,21 +114,10 @@ describe("MANGAVERSE discovery platform", () => {
     expect(screen.getByRole("link", { name: "View details for One Piece" })).toBeInTheDocument();
   });
 
-  it("retains the independent demo storefront, cart, wishlist, and newsletter", async () => {
-    const user = userEvent.setup();
+  it("keeps the standalone demo store out of navigation and routes", async () => {
     renderApp("/store");
-    await user.click(screen.getByRole("button", { name: "Add The Last Ronin to bag" }));
-    expect(screen.getByRole("button", { name: "Open bag, 1 items" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Open bag, 1 items" }));
-    const drawer = screen.getByRole("dialog", { name: /the bag/i });
-    expect(within(drawer).getAllByText("The Last Ronin")).not.toHaveLength(0);
-    await user.click(within(drawer).getByRole("button", { name: "Increase The Last Ronin quantity" }));
-    expect(screen.getByRole("button", { name: "Open bag, 2 items" })).toBeInTheDocument();
-    await user.click(within(drawer).getByRole("button", { name: "Remove The Last Ronin" }));
-    expect(screen.getByText("Your bag is taking a breather.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Close bag" }));
-    await user.click(screen.getByRole("button", { name: "Add Paper Moons to wishlist" }));
-    expect(screen.getByRole("link", { name: /wishlist, 1 saved items/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /enter the world of manga/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /demo store/i })).not.toBeInTheDocument();
   });
 
   it("validates the newsletter address and confirms a valid subscription", async () => {

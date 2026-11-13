@@ -14,15 +14,17 @@ afterEach(() => {
 });
 
 describe("AniList service", () => {
-  it("requests all feeds in one GraphQL request and caches normalized results", async () => {
+  it("requests catalogue feeds and curated titles, then caches normalized results", async () => {
     const fetchImpl = mockAniListFetch();
     const result = await fetchAniListCatalog({ fetchImpl });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(5);
     const request = JSON.parse(fetchImpl.mock.calls[0][1].body);
     expect(request.query).toContain("popularManga");
     expect(request.query).toContain("trendingAnime");
     expect(result.catalog.popularManga[0].displayTitle).toBe("One Piece");
     expect(result.catalog.popularManga[0].coverUrl).toContain("1.jpg");
+    expect(result.catalog.curatedManga).toHaveLength(18);
+    expect(result.catalog.curatedManga.map((item) => item.displayTitle)).toContain("Hunter x Hunter");
     expect(getCachedAniListCatalog().catalog.updatedManga[0].displayTitle).toBe("Demon Slayer");
     expect(window.localStorage.getItem(getAniListCacheKey())).toContain("savedAt");
   });

@@ -43,7 +43,7 @@ function Header({ onCart }) {
         <div className="header-actions">
           <Link className="header-link" to="/wishlist" aria-label={`Wishlist, ${wishlist.length} saved items`}><Heart /><span className="action-label">Saved</span>{wishlist.length > 0 && <b className="count-badge">{wishlist.length}</b>}</Link>
           <button className="header-link" onClick={onCart} aria-label={`Open bag, ${cartCount} items`}><ShoppingBag /><span className="action-label">Bag</span><b className="count-badge">{cartCount}</b></button>
-          <details className="account-menu"><summary className="header-link" aria-label="Open account menu"><UserRound /><span className="action-label">Account</span></summary><div className="account-popover"><b>Welcome to MangaVerse</b><span>Store demo · no account required</span><Link to="/wishlist" onClick={() => setMenuOpen(false)}>Your wishlist</Link><Link to="/cart" onClick={() => setMenuOpen(false)}>Your bag</Link></div></details>
+          <details className="account-menu"><summary className="header-link" aria-label="Open account menu"><UserRound /><span className="action-label">Profile</span></summary><div className="account-popover"><b>Your MangaVerse</b><span>Favorites and cart are saved on this device.</span><Link to="/favorites" onClick={() => setMenuOpen(false)}>Your favorites</Link><Link to="/manage" onClick={() => setMenuOpen(false)}>Manage series</Link><Link to="/cart" onClick={() => setMenuOpen(false)}>Your bag</Link></div></details>
         </div>
       </div>
       <nav className={`main-nav ${menuOpen ? "nav-open" : ""}`} aria-label="Main navigation">
@@ -53,9 +53,9 @@ function Header({ onCart }) {
           <Link to="/manga" onClick={() => setMenuOpen(false)}>Manga</Link>
           <Link to="/updates" onClick={() => setMenuOpen(false)}>Latest updates</Link>
           <a href="/#genres" onClick={() => setMenuOpen(false)}>Genres</a>
+          <a href="/#popular-manga" onClick={() => setMenuOpen(false)}>Collections</a>
           <Link to="/favorites" onClick={() => setMenuOpen(false)}>Favorites</Link>
           <Link to="/manage" onClick={() => setMenuOpen(false)}>Manage series</Link>
-          <Link to="/store" onClick={() => setMenuOpen(false)}>Demo store</Link>
         </div>
       </nav>
     </header>
@@ -207,8 +207,8 @@ function Newsletter() {
 }
 
 function Footer() {
-  return <footer className="footer"><div className="wrap"><div className="footer-main"><div className="footer-brand"><Brand /><p>Discover stories. Collect legends. Explore every universe.</p></div><div><h3>EXPLORE</h3><Link to="/anime">Anime</Link><Link to="/manga">Manga</Link><Link to="/updates">Latest updates</Link><Link to="/store">Demo store</Link><Link to="/manage">Series management</Link></div><div><h3>NEED A HAND?</h3><a href="mailto:hello@mangaverse.example">Contact us</a><a href="#shipping">Shipping information</a><a href="#returns">Returns & refunds</a><Link to="/cart">Your bag</Link></div><div><h3>FOLLOW THE STORY</h3><a href="https://instagram.com" target="_blank" rel="noreferrer">Instagram ↗</a><a href="https://pinterest.com" target="_blank" rel="noreferrer">Pinterest ↗</a><a href="https://youtube.com" target="_blank" rel="noreferrer">YouTube ↗</a></div></div>
-    <div className="footer-bottom"><span>© 2026 MANGAVERSE. MADE FOR STORY LOVERS.</span><span>AN INDEPENDENT DEMO MARKETPLACE <span className="footer-red">✳</span> NOT AFFILIATED WITH ANY MANGA PUBLISHER.</span><a href="#top">BACK TO TOP ↑</a></div></div></footer>;
+  return <footer className="footer"><div className="wrap">  <div className="footer-main"><div className="footer-brand"><Brand /><p>A home for manga discovery, thoughtful collections and the stories that stay with you.</p><span className="footer-socials"><a href="https://instagram.com" target="_blank" rel="noreferrer" aria-label="MangaVerse on Instagram">IG</a><a href="https://youtube.com" target="_blank" rel="noreferrer" aria-label="MangaVerse on YouTube">YT</a><a href="https://pinterest.com" target="_blank" rel="noreferrer" aria-label="MangaVerse on Pinterest">PIN</a></span></div><div><h3>EXPLORE</h3><Link to="/manga">Manga collection</Link><Link to="/anime">Anime</Link><Link to="/updates">Latest updates</Link><a href="/#genres">Popular genres</a><a href="/#popular-manga">Collections</a></div><div><h3>ABOUT</h3><p className="footer-about">MangaVerse brings readers closer to new worlds through a live catalogue and locally saved favorites.</p><a href="mailto:hello@mangaverse.example">Contact</a><Link to="/privacy">Privacy policy</Link></div><div><h3>YOUR ACCOUNT</h3><Link to="/favorites">Saved favorites</Link><Link to="/wishlist">Saved items</Link><Link to="/cart">Your cart</Link><Link to="/manage">Manage series</Link></div></div>
+    <div className="footer-bottom"><span>© 2026 MANGAVERSE. MADE FOR STORY LOVERS.</span><span>AN INDEPENDENT MANGA DISCOVERY DEMO <span className="footer-red">✳</span> NOT AFFILIATED WITH ANY PUBLISHER.</span><a href="#top">BACK TO TOP ↑</a></div></div></footer>;
 }
 
 function Modal({ product, onClose }) {
@@ -263,7 +263,7 @@ function CartPage() {
 }
 
 function OrderSummary({ subtotal, shipping }) {
-  return <aside className="order-summary"><p className="eyebrow">THE DETAILS</p><h2>Order summary</h2><div><span>Subtotal</span><b>{money(subtotal)}</b></div><div><span>Shipping</span><b>{shipping ? money(shipping) : "Complimentary"}</b></div><div className="summary-total"><span>Total</span><b>{money(subtotal + shipping)}</b></div><p className="demo-note">This is a demo storefront. No real payment will be collected.</p><Link className="button button-red checkout-button" to="/checkout">Continue to checkout <ArrowRight size={16} /></Link><Link className="continue-shopping" to="/manga">Continue shopping</Link></aside>;
+  return <aside className="order-summary"><p className="eyebrow">THE DETAILS</p><h2>Order summary</h2><div><span>Subtotal</span><b>{money(subtotal)}</b></div><div><span>Shipping</span><b>{shipping ? money(shipping) : "Complimentary"}</b></div><div className="summary-total"><span>Total</span><b>{money(subtotal + shipping)}</b></div><p className="demo-note">No payment will be collected in this prototype.</p><Link className="button button-red checkout-button" to="/checkout">Continue to checkout <ArrowRight size={16} /></Link><Link className="continue-shopping" to="/manga">Continue shopping</Link></aside>;
 }
 
 function CheckoutPage() {
@@ -272,6 +272,14 @@ function CheckoutPage() {
   const shipping = subtotal >= 999 ? 0 : 79;
   if (placed) return <main className="page-content wrap"><div className="empty-state success-state"><Check size={28} /><h2>Your demo order is in the books.</h2><p>No payment was processed. Thanks for exploring MANGAVERSE.</p><Link className="button button-red" to="/">Back to the stories</Link></div></main>;
   return <main className="page-content wrap"><div className="page-banner"><p className="eyebrow">THE FINAL CHAPTER (FOR NOW)</p><h1>Demo <em>checkout.</em></h1><p>This prototype does not process payments or save personal information.</p></div>{cart.length ? <div className="cart-page-grid"><form className="checkout-form" onSubmit={(e) => { e.preventDefault(); setPlaced(true); }}><h2>Delivery details</h2><div className="form-grid"><label>First name<input required autoComplete="given-name" /></label><label>Last name<input required autoComplete="family-name" /></label><label className="span-two">Email address<input required type="email" autoComplete="email" /></label><label className="span-two">Address<input required autoComplete="street-address" /></label><label>City<input required autoComplete="address-level2" /></label><label>Postal code<input required autoComplete="postal-code" /></label></div><h2>Payment method</h2><label className="payment-choice"><input type="radio" name="payment" defaultChecked /> Demo payment on delivery <small>No payment is collected in this prototype.</small></label><button className="button button-red" type="submit">Place demo order · {money(subtotal + shipping)} <ArrowRight size={16} /></button></form><OrderSummary subtotal={subtotal} shipping={shipping} /></div> : <div className="empty-state"><ShoppingBag size={28} /><h3>Nothing to check out just yet.</h3><Link className="button button-red" to="/manga">Explore manga</Link></div>}</main>;
+}
+
+function PrivacyPage() {
+  return <main className="wrap discovery-listing privacy-page">
+    <p className="eyebrow">MANGAVERSE · PRIVACY</p><h1>Your reading list stays <em>yours.</em></h1>
+    <p>Favorites, the demo cart and catalogue cache are stored in this browser using local storage. This demo has no account service, payment processing or newsletter backend, and does not send these saved lists to AniList.</p>
+    <Link className="text-link" to="/">Back to discovery <ArrowRight size={15} /></Link>
+  </main>;
 }
 
 function DetailPage({ onQuickView }) {
@@ -286,8 +294,8 @@ function DetailPage({ onQuickView }) {
 function App() {
   const [cartOpen, setCartOpen] = useState(false);
   const [quickView, setQuickView] = useState(null);
-  const { catalog, loading, error, usingCache, savedAt, refresh } = useAniListCatalog();
-  const discoveryProps = { catalog, loading, error, usingCache, savedAt, refresh };
+  const { catalog, loading, error, usingCache, usingFallback, savedAt, refresh } = useAniListCatalog();
+  const discoveryProps = { catalog, loading, error, usingCache, usingFallback, savedAt, refresh };
   return <div id="top" className="min-h-screen bg-ink text-paper"><Header onCart={() => setCartOpen(true)} /><Routes>
     <Route path="/" element={<><DiscoveryRoutes {...discoveryProps} /><Newsletter /></>} />
     <Route path="/anime" element={<DiscoveryRoutes {...discoveryProps} />} />
@@ -297,9 +305,9 @@ function App() {
     <Route path="/favorites" element={<DiscoveryRoutes {...discoveryProps} />} />
     <Route path="/manage" element={<DiscoveryRoutes {...discoveryProps} />} />
     <Route path="/series/:id" element={<DiscoveryRoutes {...discoveryProps} />} />
-    <Route path="/store" element={<ListingPage onQuickView={setQuickView} />} />
     <Route path="/manga/:id" element={<DetailPage onQuickView={setQuickView} />} />
     <Route path="/wishlist" element={<WishlistPage onQuickView={setQuickView} />} />
+    <Route path="/privacy" element={<PrivacyPage />} />
     <Route path="/cart" element={<CartPage />} />
     <Route path="/checkout" element={<CheckoutPage />} />
     <Route path="*" element={<DiscoveryRoutes {...discoveryProps} />} />
