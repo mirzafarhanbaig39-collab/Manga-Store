@@ -84,6 +84,31 @@ describe("MANGAVERSE discovery platform", () => {
     expect(within(drawer).getByText("Your bag is taking a breather.")).toBeInTheDocument();
   });
 
+  it("shows anime cover artwork in the bag", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByText("Live catalogue from AniList");
+    const animeCarousel = screen.getByRole("region", { name: "Trending anime carousel" });
+    await user.click(await within(animeCarousel).findByRole("button", { name: "Add demo Solo Leveling to bag" }));
+    await user.click(screen.getByRole("button", { name: "Open bag, 1 items" }));
+    const drawer = screen.getByRole("dialog", { name: /the bag/i });
+    expect(within(drawer).getByRole("img", { name: "Solo Leveling cover art" })).toBeInTheDocument();
+    expect(drawer.querySelector(".cart-thumb .cover-image")).toHaveAttribute("src", "https://example.test/4.jpg");
+  });
+
+  it("provides an account login page without saving demo credentials", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByLabelText("Open account menu"));
+    await user.click(screen.getByRole("link", { name: "Sign in" }));
+    expect(screen.getByRole("heading", { name: /welcome back/i })).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Email address"), "reader@example.com");
+    await user.type(screen.getByLabelText("Password"), "not-a-real-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(screen.getByRole("status")).toHaveTextContent(/isn't connected in this demo/i);
+    expect(window.localStorage.getItem("mangaverse-login")).toBeNull();
+  });
+
   it("opens AniList-backed series details and displays catalogue facts and relations", async () => {
     const user = userEvent.setup();
     renderApp("/series/1");

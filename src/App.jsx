@@ -43,7 +43,7 @@ function Header({ onCart }) {
         <div className="header-actions">
           <Link className="header-link" to="/wishlist" aria-label={`Wishlist, ${wishlist.length} saved items`}><Heart /><span className="action-label">Saved</span>{wishlist.length > 0 && <b className="count-badge">{wishlist.length}</b>}</Link>
           <button className="header-link" onClick={onCart} aria-label={`Open bag, ${cartCount} items`}><ShoppingBag /><span className="action-label">Bag</span><b className="count-badge">{cartCount}</b></button>
-          <details className="account-menu"><summary className="header-link" aria-label="Open account menu"><UserRound /><span className="action-label">Profile</span></summary><div className="account-popover"><b>Your MangaVerse</b><span>Favorites and cart are saved on this device.</span><Link to="/favorites" onClick={() => setMenuOpen(false)}>Your favorites</Link><Link to="/manage" onClick={() => setMenuOpen(false)}>Manage series</Link><Link to="/cart" onClick={() => setMenuOpen(false)}>Your bag</Link></div></details>
+          <details className="account-menu"><summary className="header-link" aria-label="Open account menu"><UserRound /><span className="action-label">Profile</span></summary><div className="account-popover"><b>Your MangaVerse</b><span>Favorites and cart are saved on this device.</span><Link to="/login" onClick={() => setMenuOpen(false)}>Sign in</Link><Link to="/favorites" onClick={() => setMenuOpen(false)}>Your favorites</Link><Link to="/manage" onClick={() => setMenuOpen(false)}>Manage series</Link><Link to="/cart" onClick={() => setMenuOpen(false)}>Your bag</Link></div></details>
         </div>
       </div>
       <nav className={`main-nav ${menuOpen ? "nav-open" : ""}`} aria-label="Main navigation">
@@ -63,7 +63,12 @@ function Header({ onCart }) {
 }
 
 function CoverArt({ item, large = false }) {
-  return <div className={`cover-art theme-${item.theme} ${large ? "cover-large" : ""}`} aria-label={`Illustrated cover art for ${item.title}`} role="img">
+  const [imageFailed, setImageFailed] = useState(false);
+  const coverUrl = item.coverUrl || item.imageUrl || item.coverImage?.extraLarge || item.coverImage?.large || item.coverImage?.medium;
+  useEffect(() => setImageFailed(false), [coverUrl]);
+  const showCover = Boolean(coverUrl && !imageFailed);
+  return <div className={`cover-art theme-${item.theme} ${showCover ? "has-cover-image" : ""} ${large ? "cover-large" : ""}`} aria-label={`${item.title} cover art`} role="img">
+    {showCover && <img className="cover-image" src={coverUrl} alt="" loading="lazy" decoding="async" onError={() => setImageFailed(true)} />}
     <span className="cover-orbit" /><span className="cover-sun" /><span className="cover-jp">{item.mark}</span>
     <span className="cover-caption">MANGAVERSE ORIGINAL<br />VOL. 01 — {item.genre || item.category}</span>
     <strong>{item.title}</strong><span className="cover-footer">STORIES FROM ANOTHER WORLD</span>
@@ -282,6 +287,31 @@ function PrivacyPage() {
   </main>;
 }
 
+function LoginPage() {
+  const [status, setStatus] = useState("");
+  function signIn(event) {
+    event.preventDefault();
+    setStatus("Sign-in isn't connected in this demo. Your details were not saved.");
+  }
+  return <main className="login-page wrap">
+    <section className="login-card" aria-labelledby="login-title">
+      <p className="eyebrow">YOUR MANGAVERSE ACCOUNT</p>
+      <h1 id="login-title">Welcome <em>back.</em></h1>
+      <p className="login-intro">Sign in to your reader account.</p>
+      <p className="login-demo-note">Account sign-in is a visual demo and is not connected to an authentication service.</p>
+      <form className="login-form" onSubmit={signIn}>
+        <label htmlFor="login-email">Email address</label>
+        <input id="login-email" type="email" autoComplete="email" required />
+        <label htmlFor="login-password">Password</label>
+        <input id="login-password" type="password" autoComplete="current-password" required />
+        <button className="button button-red" type="submit">Sign in <ArrowRight size={16} /></button>
+        {status && <p className="login-status" role="status">{status}</p>}
+      </form>
+      <Link className="text-link" to="/">Back to discovery <ArrowRight size={15} /></Link>
+    </section>
+  </main>;
+}
+
 function DetailPage({ onQuickView }) {
   const { addToCart, toggleWishlist, wishlist } = useStore();
   const { id } = useParams();
@@ -307,6 +337,7 @@ function App() {
     <Route path="/series/:id" element={<DiscoveryRoutes {...discoveryProps} />} />
     <Route path="/manga/:id" element={<DetailPage onQuickView={setQuickView} />} />
     <Route path="/wishlist" element={<WishlistPage onQuickView={setQuickView} />} />
+    <Route path="/login" element={<LoginPage />} />
     <Route path="/privacy" element={<PrivacyPage />} />
     <Route path="/cart" element={<CartPage />} />
     <Route path="/checkout" element={<CheckoutPage />} />
